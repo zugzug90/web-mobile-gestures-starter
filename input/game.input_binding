@@ -1,0 +1,44 @@
+key_trigger {
+  input: KEY_F3
+  action: "key_f3"
+}
+key_trigger {
+  input: KEY_M
+  action: "key_m"
+}
+key_trigger {
+  input: KEY_N
+  action: "key_n"
+}
+key_trigger {
+  input: KEY_P
+  action: "key_p"
+}
+key_trigger {
+  input: KEY_F6
+  action: "key_f6"
+}
+key_trigger {
+  input: KEY_S
+  action: "key_s"
+}
+key_trigger {
+  input: KEY_F4
+  action: "key_f4"
+}
+mouse_trigger {
+  input: MOUSE_BUTTON_1
+  action: "touch"
+}
+mouse_trigger {
+  input: MOUSE_WHEEL_UP
+  action: "mouse_wheel_up"
+}
+mouse_trigger {
+  input: MOUSE_WHEEL_DOWN
+  action: "mouse_wheel_down"
+}
+touch_trigger {
+  input: TOUCH_MULTI
+  action: "touch_multi"
+}

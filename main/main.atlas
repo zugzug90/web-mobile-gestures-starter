@@ -1,0 +1,13 @@
+images {
+  image: "/assets/images/background.png"
+}
+images {
+  image: "/assets/images/logo.png"
+}
+images {
+  image: "/builtins/graphics/particle_blob.png"
+}
+images {
+  image: "/assets/images/red_cross.png"
+}
+extrude_borders: 2

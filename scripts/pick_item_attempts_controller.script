@@ -1,0 +1,19 @@
+function init(self)
+	self.pick_item_attempt_indicator_factory = "#pick_item_attempt_indicator_factory"
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("msg.create_pick_item_attempt_indicator") then 
+		local position = message.position or vmath.vector3(0, 0, 0)
+		local rotation = message.rotation or vmath.euler_to_quat(0, 0, 0)
+		local scale = message.scale or vmath.vector3(1, 1, 1)
+
+		local indicator_id = factory.create(self.pick_item_attempt_indicator_factory, message.position, nil, nil)
+
+	--go.animate(particle.sprite_url, "tint.w", go.PLAYBACK_ONCE_FORWARD, AR.particle.alpha_out, AR.particle.alpha_out_easing, AR.particle.time_out, 0, particle_done)
+
+		go.animate(msg.url(nil, indicator_id, "sprite"), "tint.w", go.PLAYBACK_ONCE_FORWARD, 0, go.EASING_LINEAR, 0.5, 0, function()
+			go.delete(indicator_id)
+		end)
+	end
+end
