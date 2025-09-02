@@ -18,7 +18,8 @@ Project covers both Desktop and Web Mobile Platforms.
 
 ## Project Dependencies and Prerequisits
 1. Project uses [orthographic camera](https://github.com/britzl/defold-orthographic)
-2. Project uses custom `orthographic.render` and `orthographic.render_script` from orthographic camera solution
+1. Project uses [input gesture](https://github.com/britzl/defold-input/blob/master/in/gesture.md)
+1. Project uses custom `orthographic.render` and `orthographic.render_script` from orthographic camera solution
 
 ## What's implemented:
 1. Handling touches/clicks
