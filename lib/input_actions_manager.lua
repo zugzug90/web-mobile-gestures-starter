@@ -104,6 +104,8 @@ local function pinch_update(M, dt)
     -- перемещение камеры с инерцией
     M.cam_translate = (M.cam_translate or vmath.vector3(0)) * INERTIA
 
+    pprint('vmath.length(M.cam_translate)', vmath.length(M.cam_translate))
+
     if M.translate then
         if M.prev_translate then
             local p = screen_to_world(camera, M.translate.x, M.translate.y, M.translate.z) - screen_to_world(camera, M.prev_translate.x, M.prev_translate.y, M.prev_translate.z)
@@ -114,7 +116,7 @@ local function pinch_update(M, dt)
     M.translate = nil
 
     -- само перемещение + границы
-    if vmath.length(M.cam_translate) > 0.01 and not M.is_pinch_zooming and not (M.p1 and M.p2) then
+    if vmath.length(M.cam_translate) > M.min_swipe_distance and not M.is_pinch_zooming and not M.p2 then
         local position = go.get_position(CAMERA_ID) - M.cam_translate
 
         position = M.clamp_camera_position_function(position, camera.get_zoom())
@@ -133,6 +135,7 @@ local function pinch_update(M, dt)
     M.f_p2 = M.p2
     M.p1 = nil
     M.p2 = nil
+    M.is_pinch_zooming = nil
 end
 
 local function pinch_on_input(M, action_id, action)
