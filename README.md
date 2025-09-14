@@ -16,6 +16,15 @@ Project covers both Desktop and Web Mobile Platforms.
 
 🎮 **[Play Demo Here](https://zugzug90.github.io/web-mobile-gestures-starter/)**
 
+Solution is ispired by [Dragosha solution](https://dragosha.com/defold/pinch/).
+
+Idea is based on constant `update(dt)` loop + detecting tap points and analyzing current vs. previous tap point pairs distances/angles.
+
+## Module's API & Use Cases
+TBD
+
+For now please look into `input_actions_controller.script` as a basic usage case.
+
 ## Project Dependencies and Prerequisits
 1. Project uses [orthographic camera](https://github.com/britzl/defold-orthographic)
 1. Project uses [input gesture](https://github.com/britzl/defold-input/blob/master/in/gesture.md)
@@ -38,3 +47,5 @@ Additionaly there is a borders clamping on top of the camera moves and zooms beh
 
 <a href="https://www.flaticon.com/free-icons/close" title="close icons">Close icons created by Pixel perfect - Flaticon</a>
 ---
+
+<a href="https://www.flaticon.com/free-icons/cute" title="cute icons">Cute icons created by Freepik - Flaticon</a>

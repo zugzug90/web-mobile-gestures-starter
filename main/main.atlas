@@ -10,4 +10,7 @@ images {
 images {
   image: "/assets/images/red_cross.png"
 }
+images {
+  image: "/assets/images/caticorn.png"
+}
 extrude_borders: 2
