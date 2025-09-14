@@ -15,7 +15,7 @@ function init(self)
     input_actions_manager.init({
         is_mobile = is_web_mobile(),
         initial_zoom = 1,
-        mobile_zoom_step = 0.2,
+        mobile_zoom_step = 4,
         mobile_min_zoom = 0.75,
         mobile_max_zoom = 2.5,
         min_zoom = 0.75,
