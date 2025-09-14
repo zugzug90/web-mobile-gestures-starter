@@ -1,78 +1,29 @@
-local camera = require "orthographic.camera"
-local gesture = require "in.gesture"
-local desktop_zoom_manager = require("lib.desktop_zoom_manager")
-local pinch_zoom_manager_v2 = require("lib.pinch_zoom_manager_v2")
-
-local CAMERA_MOVE_DURATION = 0.2
-
-local scale_factor = 1
-local GAME_SCREEN_W, GAME_SCREEN_H = window.get_size()
-local GAME_OBJECTS_LAYER_Z = 0.9
-local pick_item_attempts_controller_id = "/pick_item_attempts_controller"
-
-local min_x = -GAME_SCREEN_W * scale_factor
-local min_y = -GAME_SCREEN_H * scale_factor
-local max_x = GAME_SCREEN_W * scale_factor
-local max_y = GAME_SCREEN_H * scale_factor
-
 local CAMERA_ID = "/camera"
 
--- @class InputActionsManager
-local M = {}
 
-function M.init()
-    gesture.SETTINGS.double_tap_interval = 1
-    gesture.SETTINGS.swipe_threshold = 20
-    gesture.SETTINGS.swipe_time = 0.5
-    gesture.SETTINGS.tap_threshold = 7
+local camera = require "orthographic.camera"
 
-    M.is_moving = false
-    M.is_swiping = false
-    M.start_position = vmath.vector3()
-    M.target_position = vmath.vector3()
-    M.elapsed_time = 0
+local GAME_OBJECTS_LAYER_Z = 0.9
+local pick_item_attempts_controller_id = "/pick_item_attempts_controller"
+local INERTIA = 0.75
 
-    desktop_zoom_manager.init()
-end
+local TOUCH_MULTI = hash("touch_multi")
+local TOUCH = hash("touch")
 
-function M.on_message(message_id, message, sender)
-    desktop_zoom_manager.on_message(message_id, message)
-end
-
-function M.update(dt)
-    if M.is_moving then
-        M.elapsed_time = M.elapsed_time + dt
-        local t = M.elapsed_time / CAMERA_MOVE_DURATION
-
-        if t >= 1 then
-            t = 1
-            M.is_moving = false
-        end
-
-        local distance = math.sqrt(math.pow(M.target_position.x - M.start_position.x, 2) + 
-                                 math.pow(M.target_position.y - M.start_position.y, 2))
-        if distance < 10 then
-            M.start_position = M.target_position
-        end
-        local new_pos = vmath.lerp(t, M.start_position, M.target_position)
-        go.set_position(new_pos, CAMERA_ID)
-    end
-end
-
-local function clamp_vector_length(vec, min_len, max_len)
-    local len = vmath.length(vec)
-    if len < min_len then
-        return vmath.normalize(vec) * min_len
-    elseif len > max_len then
-        return vmath.normalize(vec) * max_len
-    else
-        return vec
-    end
-end
+-- Constants
+local ZOOM_STEP = 1
 
 local function clamp_camera_position(pos, zoom)
-    local visible_w = GAME_SCREEN_W / zoom
-    local visible_h = GAME_SCREEN_H / zoom
+
+    local scale_factor = 1
+    local window_width, window_height = window.get_size()
+    local min_x = -window_width * 1 * scale_factor
+    local min_y = -window_height * 1 * scale_factor
+    local max_x = window_width * 1 * scale_factor
+    local max_y = window_height * 1 * scale_factor
+
+    local visible_w = window_width / zoom
+    local visible_h = window_height / zoom
 
     local half_w = visible_w / 2
     local half_h = visible_h / 2
@@ -99,113 +50,212 @@ local function place_touch_indicator(action)
     msg.post(pick_item_attempts_controller_id, hash("msg.create_pick_item_attempt_indicator"), { position = world_pos })
 end
 
-local function calculate_min_swipe_distance()
-    width, height = window.get_size()
-    return math.sqrt(width * width + height * height) * 0.02
-end
-
-local function calculate_max_swipe_distance()
-    width, height = window.get_size()
-    return math.sqrt(width * width + height * height) * 0.25
-end
-
-local function resolve_crossplatform_game_action_type(action_id, action, g)
-    if g then
-        if g.swipe and g.swipe.to and g.swipe.from and 
-           not pinch_zoom_manager_v2.is_in_pinch_mode() and 
-           not action.touch then
-            return "swipe"
-        end
-    end
-    if action.released and action_id ~= hash("mouse_wheel_up") and action_id ~= hash("mouse_wheel_down") then
-        if not action.touch and not pinch_zoom_manager_v2.is_in_pinch_mode() then
-            return "place_touch_indicator"
-        end
-    end
-end
-
-local function resolve_desktop_game_action_type(action_id, action, g)
-    if action_id == hash("mouse_wheel_up") then
-        return "zoom_in"
-    end
-    if action_id == hash("mouse_wheel_down") then
-        return "zoom_out"
-    end
-    return nil
-end
-
-local game_action_handlers = {
-    place_touch_indicator = function(action, action_id, g)
-        place_touch_indicator(action)
-    end,
-    zoom_in = function(action, action_id, g)
-        desktop_zoom_manager.handle_zoom_in(clamp_camera_position)
-    end,
-    zoom_out = function(action, action_id, g)
-        desktop_zoom_manager.handle_zoom_out(clamp_camera_position)
-    end,
-    pinch_zoom = function(action, action_id, g)
-        --pinch_zoom_manager.handle_pinch_zoom(action, action_id, g, clamp_camera_position)
-    end,
-    swipe = function(action, action_id, g)
-        local swipe_vector = g.swipe.to - g.swipe.from
-        swipe_vector = swipe_vector * -1
-
-        local min_swipe_distance = calculate_min_swipe_distance()
-        local max_swipe_distance = calculate_max_swipe_distance()
-
-        local clamped_vector = clamp_vector_length(swipe_vector, min_swipe_distance, max_swipe_distance)
-        print('clamped_vector', clamped_vector)
-        print('desktop_zoom_manager.get_current_zoom()', tostring(desktop_zoom_manager.get_current_zoom()))
-        local adjusted_vector = clamped_vector / desktop_zoom_manager.get_current_zoom()
-
-        local current_position = go.get_position(CAMERA_ID)
-        M.start_position = current_position
-        local raw_target_position = current_position + vmath.vector3(adjusted_vector.x, adjusted_vector.y, 0)
-        M.target_position = clamp_camera_position(raw_target_position, desktop_zoom_manager.get_current_zoom())
-
-        M.elapsed_time = 0
-        M.is_moving = true
-        M.is_swiping = true
-    end
+--- @class InputActionsManager
+--- @field zoom_speed number Speed (pace) of zooming in/out
+--- @field min_zoom number limit of zooming out - default is 1
+--- @field max_zoom number limit of zooming in - default is 2.25
+--- @field min_swipe_distance number min swipe distance in pixels to distinguish swipe from tap/click. Default is 10
+--- @field zoom_step number single zoom in / zoom out step delta. Default is 0.2
+--- @field clamp_camera_position_function function<vector3, number> function to clamp camera position to game level borders after zooming and when navigating
+--- @field on_single_tap_function function<table> function to execute custom logic on single tap (click). Receives Defold input "action" table as argument.
+local M = {
+    controls_locked = false,
+    zoom_speed = 0.1,
+    current_zoom = 1,
+    min_zoom = 1,
+    min_swipe_distance = 10,
+    zoom_step = ZOOM_STEP,
+    max_zoom = 2.25,
+    clamp_camera_position_function = clamp_camera_position,
+    on_single_tap_function = place_touch_indicator
 }
 
-function M.handle_desktop_input(action_id, action, g)
-    local game_action_type = resolve_desktop_game_action_type(action_id, action, g)
-    if game_action_type and game_action_handlers[game_action_type] then
-        game_action_handlers[game_action_type](action, action_id, g)
-        return true
-    end
-    return false
-end
+local function pinch_update(M, dt)
+    -- Пинч если есть позици двух тапав и предыдущие значения
+    if M.p1 and M.p2 and M.f_p1 and M.f_p2 then
+        -- local w0 = (self.f_p2 - self.f_p1)
+        -- local w1 = (self.p2 - self.p1)
+        -- Вектора между тапами в мировых координатах
 
-function M.handle_crossplatform_input(action_id, action, g)
-    if action.released then
-        if M.is_swiping then
-            M.is_swiping = false
-            return
-        end
-    end
+        local w0 = screen_to_world(camera, M.f_p2.x, M.f_p2.y, M.f_p2.z) - screen_to_world(camera, M.f_p1.x, M.f_p1.y, M.f_p1.z)
+        local w1 = screen_to_world(camera, M.p2.x, M.p2.y, M.p2.z) - screen_to_world(camera, M.p1.x, M.p1.y, M.p1.z)
+
+        -- Calculate the distance between points for both frames
+        local prev_distance = vmath.length(w0)
+        local curr_distance = vmath.length(w1)
+        
+        -- Determine if it's pinch in or out
+        local is_pinch_in = curr_distance < prev_distance
+        local is_pinch_out = curr_distance > prev_distance
+
+        -- Масштаб
     
-    local game_action_type = resolve_crossplatform_game_action_type(action_id, action, g)
-    if game_action_type and game_action_handlers[game_action_type] then
-        game_action_handlers[game_action_type](action, action_id, g)
-        return true
+        --go.set(M.camera_go_id, "position.z", vmath.clamp(z, 300, 940))
+        --camera.set_zoom(nil, scale)
+        if is_pinch_in then
+            M.handle_zoom_out(M.clamp_camera_position_function, dt)
+        elseif is_pinch_out then
+            M.handle_zoom_in(M.clamp_camera_position_function, dt)
+        end
+
+        M.is_pinch_zooming = true
     end
-    return false
+
+    -- перемещение камеры с инерцией
+    M.cam_translate = (M.cam_translate or vmath.vector3(0)) * INERTIA
+
+    pprint('vmath.length(M.cam_translate)', vmath.length(M.cam_translate))
+
+    if M.translate then
+        if M.prev_translate then
+            local p = screen_to_world(camera, M.translate.x, M.translate.y, M.translate.z) - screen_to_world(camera, M.prev_translate.x, M.prev_translate.y, M.prev_translate.z)
+            M.cam_translate = p
+        end
+    end
+    M.prev_translate = M.translate
+    M.translate = nil
+
+    -- само перемещение + границы
+    if vmath.length(M.cam_translate) > M.min_swipe_distance and not M.is_pinch_zooming and not M.p2 then
+        local position = go.get_position(CAMERA_ID) - M.cam_translate
+
+        position = M.clamp_camera_position_function(position, camera.get_zoom())
+
+        go.set_position(position, CAMERA_ID)
+
+        M.is_moving = true
+    else
+        timer.delay(0, false, function ()
+            M.is_moving = false
+        end)
+    end
+
+    -- запоминаем текущие позиции для следующего кадра
+    M.f_p1 = M.p1
+    M.f_p2 = M.p2
+    M.p1 = nil
+    M.p2 = nil
+    M.is_pinch_zooming = nil
 end
 
-function M.on_input(action_id, action)
-
-    local is_pinch_zoom_happening = pinch_zoom_manager_v2.on_input(action_id, action)
-    if not is_pinch_zoom_happening then
-    local g = gesture.on_input(M, action_id, action)
-        if M.handle_crossplatform_input(action_id, action, g) then
-            return
+local function pinch_on_input(M, action_id, action)
+    local ret = true
+    -- обрабатываем мультитач
+    if action_id == TOUCH_MULTI then
+        for i, v in ipairs(action.touch) do
+            if i == 1 then
+                M.p1 = vmath.vector3(v.x, v.y, 0)
+            elseif i == 2 then
+                M.p2 = vmath.vector3(v.x, v.y, 0)
+            end
         end
-        M.handle_desktop_input(action_id, action, g)
+    -- сингловый тач (на мульти тоже придет на первый тап + мышка имитирует тач)
+    elseif action_id == TOUCH and not action.touch then
+        M.translate = vmath.vector3(action.x, action.y, 0)
+
+        if action.pressed then
+            M.single_touch_point = vmath.vector3(action.x, action.y, 0)
+        end
+
+        if action.released and not (M.is_pinch_zooming or M.is_moving) then
+
+            if M.single_touch_point and vmath.length(M.single_touch_point - vmath.vector3(action.x, action.y, 0)) < M.min_swipe_distance then
+                -- это клик, а не свайп
+                M.on_single_tap_function(action)
+                M.single_touch_point = nil
+            elseif not M.single_touch_point then
+                M.on_single_tap_function(action)
+            end
+        elseif action.released then
+            timer.delay(0, false, function (self, handle, time_elapsed)
+                M.is_pinch_zooming = false
+                M.is_moving = false
+                M.single_touch_point = nil
+            end)
+        end
     end
- 
+
+    return ret
+end
+
+M.update = function(dt)
+    pinch_update(M, dt)
+end
+
+--- Handle zoom in action
+--- @param clamp_camera_fn function|nil
+function M.handle_zoom_in(clamp_camera_fn, dt)
+    local effective_dt = dt or 0.16
+    local new_zoom = math.min(M.current_zoom + M.zoom_step * effective_dt, M.max_zoom)
+    if new_zoom ~= M.current_zoom then
+        M.current_zoom = new_zoom
+        camera.set_zoom(nil, M.current_zoom)
+        if clamp_camera_fn then
+            local clamped_pos = clamp_camera_fn(go.get_position(CAMERA_ID), M.current_zoom)
+            go.set_position(clamped_pos, CAMERA_ID)
+        end
+    end
+end
+
+--- Handle zoom out action
+--- @param clamp_camera_fn function|nil
+function M.handle_zoom_out(clamp_camera_fn, dt)
+    local effective_dt = dt or 0.16
+    local new_zoom = math.max(M.current_zoom - M.zoom_step * effective_dt, M.min_zoom)
+    if new_zoom ~= M.current_zoom then
+        M.current_zoom = new_zoom
+        camera.set_zoom(nil, M.current_zoom)
+        if clamp_camera_fn then
+            local clamped_pos = clamp_camera_fn(go.get_position(CAMERA_ID), M.current_zoom)
+            go.set_position(clamped_pos, CAMERA_ID)
+        end
+    end
+end
+
+M.on_input = function(action_id, action)
+
+    -- зум мышкой
+    if true then
+        if action_id == hash("mouse_wheel_up") then
+            M.handle_zoom_in(M.clamp_camera_position_function)
+            return true
+        elseif action_id == hash("mouse_wheel_down") then
+            M.handle_zoom_out(M.clamp_camera_position_function)
+            return true
+        end
+    end
+
+    -- мульти-пульти и мув камеры (универсальный мышкой и тачем) 
+    if pinch_on_input(M, action_id, action) then return true end
+end
+
+--- @class InputActionsManagerOptions
+--- @field is_mobile boolean    
+--- @field min_swipe_distance number|nil min swipe distance in pixels to distinguish swipe from tap/click. Default is 10    
+--- @field initial_zoom number|nil initial zoom level on game start. Default is 1
+--- @field mobile_zoom_step number|nil single zoom in / zoom out step delta for mobile. Default is 0.2
+--- @field mobile_min_zoom number|nil limit of zooming out for mobile - default is 1
+--- @field mobile_max_zoom number|nil limit of zooming in for mobile - default is 2.25
+--- @field min_zoom number|nil limit of zooming in for desktop - default is 1
+--- @field max_zoom number|nil limit of zooming in for desktop - default is 2.25
+--- @field clamp_camera_position_function function<vector3, number>|nil function to clamp camera position to game level borders after zooming and when navigating
+--- @field on_single_tap_function function<table>|nil function to execute custom logic on single tap (click). Receives Defold input "action" table as argument.
+
+---Initialize the game level input actions manager
+---@param options InputActionsManagerOptions
+function M.init(options)
+    M.current_zoom = options.initial_zoom
+    M.min_swipe_distance = options.min_swipe_distance or M.min_swipe_distance
+    M.min_zoom = options.min_zoom or M.min_zoom
+    M.max_zoom = options.max_zoom or M.max_zoom
+    if options.is_mobile then
+        M.zoom_step = options.mobile_zoom_step or M.zoom_step
+        M.min_zoom = options.mobile_min_zoom or M.min_zoom
+        M.max_zoom = options.mobile_max_zoom or M.max_zoom
+    end
+    M.clamp_camera_position_function = options.clamp_camera_position_function or M.clamp_camera_position_function
+    M.on_single_tap_function = options.on_single_tap_function or M.on_single_tap_function
+    
 end
 
 return M

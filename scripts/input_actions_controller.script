@@ -1,16 +1,30 @@
 local input_actions_manager = require("lib.input_actions_manager")
 
+---Check if device is HTML5 mobile
+---@return boolean
+local function is_web_mobile()
+	if html5 then
+        local res = html5.run("(typeof window.orientation !== 'undefined') || (navigator.userAgent.indexOf('IEMobile') !== -1);")
+		return res == "true"
+	end
+	return false
+end
+
 function init(self)
     msg.post(".", "acquire_input_focus")
-    input_actions_manager.init()
+    input_actions_manager.init({
+        is_mobile = is_web_mobile(),
+        initial_zoom = 1,
+        mobile_zoom_step = 4,
+        mobile_min_zoom = 0.75,
+        mobile_max_zoom = 2.5,
+        min_zoom = 0.75,
+        max_zoom = 2.5
+    })
 end
 
 function update(self, dt)
     input_actions_manager.update(dt)
-end
-
-function on_message(self, message_id, message, sender)
-    input_actions_manager.on_message(message_id, message, sender)
 end
 
 function on_input(self, action_id, action)
